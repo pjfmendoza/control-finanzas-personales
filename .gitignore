@@ -1,0 +1,41 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+
+# Environment variables & secrets (CRITICAL: Never commit secrets)
+.env
+.env*.local
+.env.development
+.env.test
+.env.production
+!.env.example
+
+# Build artifacts & caches
+dist/
+build/
+.turbo/
+.cache/
+
+# Testing
+coverage/
+
+# Vercel
+.vercel/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.pem
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
