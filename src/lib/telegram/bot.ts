@@ -62,7 +62,7 @@ export class TelegramBotClient {
    */
   async sendTransactionConfirmation(chatId: number, tx: Transaction): Promise<any> {
     const text = formatTransactionConfirmation(tx);
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const appUrl = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://control-finanzas-personales-psi.vercel.app');
 
     const replyMarkup = {
       inline_keyboard: [

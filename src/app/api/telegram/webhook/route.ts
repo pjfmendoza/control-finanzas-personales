@@ -79,9 +79,23 @@ export async function POST(req: NextRequest) {
     }
 
     // Comandos informativos
-    if (text === '/start' || text === '/help') {
-      const welcome = `👋 *¡Hola! Soy tu Agente Personal de Finanzas.*\n\nPuedes registrar gastos o hacerme preguntas en lenguaje natural chileno:\n\n*Ejemplos de registro:*\n• _"Gasté 14.500 en almuerzo"_\n• _"Compré 38 lucas en el Líder"_\n• _"Ayer cargué 25 mil de bencina"_\n• _"El sábado gasté 45 lucas en un bar"_\n• _"Me depositaron 780 lucas de arriendo"_\n\n*Ejemplos de consultas:*\n• _"¿Cuánto llevo gastado este mes?"_\n• _"¿En qué estoy gastando más?"_\n• _"Muéstrame mis últimos movimientos"_\n• _"Compara este mes con el anterior"_\n\nTodo lo que escribas queda registrado de inmediato y visible en tu Dashboard 24/7.`;
+    const lowerText = text.toLowerCase();
+    if (lowerText === '/start' || lowerText === '/help') {
+      const welcome = `👋 *¡Hola! Soy tu Agente Personal de Finanzas.*\n\nPuedes registrar gastos o hacerme preguntas en lenguaje natural chileno:\n\n*Ejemplos de registro:*\n• _"Gasté 14.500 en almuerzo"_\n• _"Compré 38 lucas en el Líder"_\n• _"Ayer cargué 25 mil de bencina"_\n• _"El sábado gasté 45 lucas en un bar"_\n• _"Me depositaron 780 lucas de arriendo"_\n\n*Ejemplos de consultas:*\n• _"¿Cuánto llevo gastado este mes?"_\n• _"¿En qué estoy gastando más?"_\n• _"Muéstrame mis últimos movimientos"_\n• _"Compara este mes con el anterior"_\n\n*Comandos útiles:*\n• /dashboard - Abre tu panel web analítico en el teléfono o PC\n\nTodo lo que escribas queda registrado de inmediato y visible en tu Dashboard 24/7.`;
       await telegramBot.sendMessage(chatId, welcome);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (lowerText === '/dashboard' || lowerText === '/link' || lowerText === 'dashboard' || lowerText === 'link') {
+      const appUrl = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://control-finanzas-personales-psi.vercel.app');
+      const dashboardMsg = `📊 *Tu Dashboard Web de Finanzas:*\n\n👉 [${appUrl}/dashboard](${appUrl}/dashboard)\n\n🔑 *Contraseña:* \`admin\`\n\n📱 *Para usarlo como App en tu teléfono:*\nAbre el enlace en Safari (iPhone) o Chrome (Android) y selecciona *\"Agregar a la pantalla de inicio\"*.`;
+      await telegramBot.sendMessage(chatId, dashboardMsg, {
+        replyMarkup: {
+          inline_keyboard: [
+            [{ text: '📊 Abrir Dashboard Web', url: `${appUrl}/dashboard` }]
+          ]
+        }
+      });
       return NextResponse.json({ ok: true });
     }
 
