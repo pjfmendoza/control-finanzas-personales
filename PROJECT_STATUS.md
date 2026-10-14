@@ -40,8 +40,11 @@ Este archivo refleja el estado de avance en tiempo real del proyecto, facilitand
    - Tablas: `accounts`, `categories`, `merchants`, `transactions`, `telegram_updates`, `budgets`.
    - Transacciones registradas y auditadas exitosamente.
 3. **Dashboard Web en Vercel:**
-   - URL: `https://control-finanzas-personales-psi.vercel.app`.
+   - URL: [https://control-finanzas-personales-psi.vercel.app](https://control-finanzas-personales-psi.vercel.app).
    - Autenticación con contraseña única y cookie HTTP-Only segura.
-   - Analítica en tiempo real (KPIs, categorías, comercios, búsqueda, CRUD y exportador CSV/JSON).
+   - Analítica avanzada con **Recharts** (Gráfico Donut interactivo, Curva de evolución temporal acumulada del mes).
+   - Métricas de salud financiera: Proyección a fin de mes (Run-rate), gasto diario promedio, mayor gasto único, días sin gasto.
+   - Categorizador inteligente chileno con 45+ comercios/conceptos y selector desplegable para reclasificación en vivo.
+   - Búsqueda, filtrado, CRUD completo de movimientos y exportador CSV/JSON.
 4. **Costo Mensual:**
    - **$0.00 USD / mes garantizado** (Free Tiers de Vercel, Supabase y Telegram).
