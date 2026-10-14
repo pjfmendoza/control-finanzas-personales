@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   TrendingUp,
@@ -19,10 +19,61 @@ import {
   Calendar,
   Building2,
   Tag,
-  AlertCircle
+  AlertCircle,
+  PieChart as PieIcon,
+  Activity,
+  Flame,
+  Award,
+  ArrowUpRight,
+  Sparkles,
+  ChevronDown
 } from 'lucide-react';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend
+} from 'recharts';
 import { Transaction, FinancialSummary } from '@/types';
 import { formatCLP } from '@/lib/chilean-parser/currency';
+
+const CATEGORY_COLORS: Record<string, string> = {
+  'Supermercado': '#10b981', // Emerald
+  'Alimentación': '#f97316', // Orange
+  'Transporte': '#3b82f6',   // Blue
+  'Servicios': '#eab308',     // Yellow
+  'Vivienda': '#6366f1',      // Indigo
+  'Salud': '#ec4899',         // Pink
+  'Entretenimiento': '#a855f7', // Purple
+  'Suscripciones': '#ef4444', // Red
+  'Compras': '#06b6d4',       // Cyan
+  'Mascotas': '#14b8a6',      // Teal
+  'Inversiones': '#8b5cf6',   // Violet
+  'Otros': '#64748b',         // Slate
+};
+
+const CATEGORIES_LIST = [
+  'Supermercado',
+  'Alimentación',
+  'Transporte',
+  'Servicios',
+  'Vivienda',
+  'Salud',
+  'Entretenimiento',
+  'Suscripciones',
+  'Compras',
+  'Mascotas',
+  'Inversiones',
+  'Sueldo & Honorarios',
+  'Otros',
+];
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -32,6 +83,7 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'expense' | 'income'>('all');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -48,7 +100,7 @@ export default function DashboardPage() {
     try {
       const [sumRes, txRes] = await Promise.all([
         fetch('/api/summary'),
-        fetch('/api/transactions?limit=150'),
+        fetch('/api/transactions?limit=200'),
       ]);
 
       if (sumRes.status === 401 || txRes.status === 401) {
@@ -98,6 +150,23 @@ export default function DashboardPage() {
     }
   };
 
+  const handleCategoryChange = async (id: string, newCategory: string) => {
+    try {
+      const res = await fetch(`/api/transactions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryName: newCategory }),
+      });
+      if (res.ok) {
+        setActionMessage(`Reclasificado a "${newCategory}"`);
+        setTimeout(() => setActionMessage(null), 3000);
+        fetchData();
+      }
+    } catch (err) {
+      alert('Error al actualizar categoría');
+    }
+  };
+
   const handleCreateTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     const amountNum = parseInt(formAmount.replace(/\D/g, ''), 10);
@@ -140,17 +209,41 @@ export default function DashboardPage() {
     }
   };
 
-  const filteredTransactions = transactions.filter(t => {
-    if (typeFilter !== 'all' && t.type !== typeFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchDesc = t.description?.toLowerCase().includes(q);
-      const matchCat = t.categoryName?.toLowerCase().includes(q);
-      const matchMerch = t.merchantName?.toLowerCase().includes(q);
-      return matchDesc || matchCat || matchMerch;
-    }
-    return true;
-  });
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      if (typeFilter !== 'all' && t.type !== typeFilter) return false;
+      if (selectedCategoryFilter !== 'all' && t.categoryName !== selectedCategoryFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchDesc = t.description?.toLowerCase().includes(q);
+        const matchCat = t.categoryName?.toLowerCase().includes(q);
+        const matchMerch = t.merchantName?.toLowerCase().includes(q);
+        return matchDesc || matchCat || matchMerch;
+      }
+      return true;
+    });
+  }, [transactions, typeFilter, selectedCategoryFilter, searchQuery]);
+
+  // Datos para gráfico de Dona (Pie Chart)
+  const pieChartData = useMemo(() => {
+    if (!summary?.byCategory) return [];
+    return summary.byCategory.map(c => ({
+      name: c.categoryName,
+      value: c.amount,
+      percentage: c.percentage,
+      color: CATEGORY_COLORS[c.categoryName] || '#64748b',
+    }));
+  }, [summary]);
+
+  // Datos para gráfico de Tendencia Temporal (Area Chart)
+  const areaChartData = useMemo(() => {
+    if (!summary?.dailyTrend) return [];
+    return summary.dailyTrend.map(d => ({
+      dia: `Día ${d.day}`,
+      gastoDiario: d.amount,
+      acumulado: d.cumulativeAmount,
+    }));
+  }, [summary]);
 
   if (loading) {
     return (
@@ -166,19 +259,22 @@ export default function DashboardPage() {
   const isNetPositive = (summary?.netSavings || 0) >= 0;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-16">
+    <div className="min-h-screen bg-slate-950 text-slate-100 pb-20">
       {/* Top Navbar */}
-      <header className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80 px-4 sm:px-8 py-3.5 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-slate-950/85 backdrop-blur-md border-b border-slate-800/80 px-4 sm:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-600/20 border border-indigo-500/30 rounded-xl text-indigo-400">
             <PiggyBank className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base sm:text-lg font-bold text-white tracking-tight">
-              Control de Finanzas
+            <h1 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              <span>Control de Finanzas</span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                24/7 Cloud
+              </span>
             </h1>
             <p className="text-xs text-slate-400 hidden sm:block">
-              Período actual: {summary?.period || 'En curso'}
+              Período activo: <span className="text-slate-200 font-medium">{summary?.period || 'En curso'}</span>
             </p>
           </div>
         </div>
@@ -251,7 +347,7 @@ export default function DashboardPage() {
               <span className={`font-semibold ${isNetPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {summary?.savingsRate || 0}%
               </span>
-              <span>tasa de ahorro este mes</span>
+              <span>tasa de ahorro mensual</span>
             </div>
           </div>
 
@@ -267,7 +363,7 @@ export default function DashboardPage() {
               {formatCLP(summary?.totalIncome || 0)}
             </div>
             <p className="mt-2 text-xs text-slate-400">
-              Registrados en el período
+              Registrados en este período
             </p>
           </div>
 
@@ -288,81 +384,246 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Analítica Visual: Desglose por Categoría y Comercios */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Gastos por Categoría */}
-          <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-5">
+        {/* FINTECH INTELLIGENCE ROW: Proyección y Métricas Avanzadas */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Proyección Fin de Mes */}
+          <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                Proyección Fin de Mes
+              </span>
+              <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-300">
+                Día {summary?.elapsedDays || 1} de {summary?.daysInMonth || 31}
+              </span>
+            </div>
+            <div className="text-xl font-bold text-amber-300">
+              {formatCLP(summary?.projectedEndMonthExpenses || 0)}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Ritmo estimado al cierre del mes
+            </p>
+          </div>
+
+          {/* Gasto Promedio Diario */}
+          <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Activity className="w-3.5 h-3.5 text-indigo-400" />
+                Promedio Diario
+              </span>
+            </div>
+            <div className="text-xl font-bold text-indigo-300">
+              {formatCLP(summary?.dailyAverage || 0)} <span className="text-xs font-normal text-slate-400">/ día</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              En los {summary?.elapsedDays || 1} días transcurridos
+            </p>
+          </div>
+
+          {/* Mayor Gasto del Mes */}
+          <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Flame className="w-3.5 h-3.5 text-rose-400" />
+                Mayor Gasto Único
+              </span>
+            </div>
+            <div className="text-xl font-bold text-rose-300 truncate">
+              {summary?.maxExpense ? formatCLP(summary.maxExpense.amount) : '$0'}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1 truncate">
+              {summary?.maxExpense ? `${summary.maxExpense.description}` : 'Sin registros'}
+            </p>
+          </div>
+
+          {/* Días Sin Gastos */}
+          <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Award className="w-3.5 h-3.5 text-emerald-400" />
+                Días de Cero Gasto
+              </span>
+            </div>
+            <div className="text-xl font-bold text-emerald-300">
+              {summary?.noSpendDays || 0} <span className="text-xs font-normal text-slate-400">días</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Días con $0 gastos registrados
+            </p>
+          </div>
+        </div>
+
+        {/* ANALÍTICA VISUAL AVANZADA: Gráfico de Dona y Curva de Evolución Temporal */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Gráfico 1: Dona Interactiva de Categorías (Recharts) */}
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-sm flex flex-col">
+            <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-base font-bold text-white">Gastos por Categoría</h2>
-                <p className="text-xs text-slate-400">¿En qué estás gastando este mes?</p>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <PieIcon className="w-4 h-4 text-indigo-400" />
+                  Distribución por Categorías
+                </h2>
+                <p className="text-xs text-slate-400">Porcentaje y concentración de gastos</p>
               </div>
               <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full">
-                {summary?.byCategory.length || 0} categorías activas
+                {pieChartData.length} categorías
               </span>
             </div>
 
-            {(!summary?.byCategory || summary.byCategory.length === 0) ? (
-              <div className="py-10 text-center text-slate-500 text-sm">
+            {pieChartData.length === 0 ? (
+              <div className="py-20 text-center text-slate-500 text-xs my-auto">
                 No hay gastos registrados en este período.
               </div>
             ) : (
-              <div className="space-y-3.5">
-                {summary.byCategory.map((cat) => (
-                  <div key={cat.categoryName} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-slate-200">{cat.categoryName}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white">{formatCLP(cat.amount)}</span>
-                        <span className="text-slate-400">({cat.percentage}%)</span>
-                      </div>
-                    </div>
-                    {/* Barra de progreso */}
-                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(cat.percentage, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+              <div className="h-64 sm:h-72 w-full my-auto">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={95}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(val: number) => [formatCLP(val), 'Monto']}
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        borderColor: '#334155',
+                        borderRadius: '0.75rem',
+                        fontSize: '12px',
+                        color: '#fff',
+                      }}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={36}
+                      formatter={(value, entry: any) => (
+                        <span className="text-xs text-slate-300 mr-2">
+                          {value} ({entry.payload.percentage}%)
+                        </span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
             )}
           </div>
 
-          {/* Top Comercios */}
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-sm">
-            <h2 className="text-base font-bold text-white mb-1">Principales Comercios</h2>
-            <p className="text-xs text-slate-400 mb-5">Lugares con mayor gasto acumulado</p>
+          {/* Gráfico 2: Curva de Evolución Temporal Acumulada (Recharts AreaChart) */}
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-sm flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-400" />
+                  Evolución Acumulada en el Mes
+                </h2>
+                <p className="text-xs text-slate-400">Comportamiento del gasto a través de los días</p>
+              </div>
+              <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                {formatCLP(summary?.totalExpenses || 0)} Total
+              </span>
+            </div>
 
-            {(!summary?.topMerchants || summary.topMerchants.length === 0) ? (
-              <div className="py-10 text-center text-slate-500 text-sm">
-                Sin comercios registrados aún.
+            {areaChartData.length === 0 ? (
+              <div className="py-20 text-center text-slate-500 text-xs my-auto">
+                Sin datos temporales para graficar.
               </div>
             ) : (
-              <div className="space-y-3">
-                {summary.topMerchants.map((m, idx) => (
-                  <div key={m.merchantName} className="flex items-center justify-between p-3 bg-slate-950/60 border border-slate-800/60 rounded-xl">
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-5 h-5 flex items-center justify-center text-xs font-bold text-slate-400 bg-slate-800 rounded-full">
-                        {idx + 1}
-                      </span>
-                      <span className="text-xs font-medium text-slate-200">{m.merchantName}</span>
-                    </div>
-                    <span className="text-xs font-semibold text-rose-300">{formatCLP(m.amount)}</span>
-                  </div>
-                ))}
+              <div className="h-64 sm:h-72 w-full my-auto">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={areaChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorAcumulado" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                    <XAxis dataKey="dia" stroke="#64748b" fontSize={11} tickLine={false} />
+                    <YAxis
+                      stroke="#64748b"
+                      fontSize={11}
+                      tickLine={false}
+                      tickFormatter={(v) => `$${Math.round(v / 1000)}k`}
+                    />
+                    <Tooltip
+                      formatter={(val: number, name: string) => [
+                        formatCLP(val),
+                        name === 'acumulado' ? 'Gasto Acumulado' : 'Gasto del Día',
+                      ]}
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        borderColor: '#334155',
+                        borderRadius: '0.75rem',
+                        fontSize: '12px',
+                        color: '#fff',
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="acumulado"
+                      stroke="#6366f1"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#colorAcumulado)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             )}
           </div>
         </div>
 
-        {/* Sección de Movimientos (CRUD Completo) */}
+        {/* Sección de Principales Comercios */}
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-sky-400" />
+                Principales Comercios & Lugares
+              </h2>
+              <p className="text-xs text-slate-400">Establecimientos con mayor volumen de compras</p>
+            </div>
+          </div>
+
+          {(!summary?.topMerchants || summary.topMerchants.length === 0) ? (
+            <div className="py-6 text-center text-slate-500 text-xs">
+              Sin comercios detectados aún.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {summary.topMerchants.map((m, idx) => (
+                <div key={m.merchantName} className="p-3.5 bg-slate-950/70 border border-slate-800/70 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-6 h-6 flex items-center justify-center text-xs font-bold text-slate-300 bg-slate-800 rounded-lg shrink-0">
+                      {idx + 1}
+                    </span>
+                    <div className="truncate">
+                      <span className="text-xs font-semibold text-slate-200 block truncate">{m.merchantName}</span>
+                      <span className="text-[10px] text-slate-500">{m.count} {m.count === 1 ? 'compra' : 'compras'}</span>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-rose-300 shrink-0 ml-2">{formatCLP(m.amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sección de Movimientos (CRUD Completo y Reclasificación en Vivo) */}
         <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-sm space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-white">Movimientos</h2>
-              <p className="text-xs text-slate-400">Historial completo con filtros y administración directa</p>
+              <p className="text-xs text-slate-400">Historial completo con edición de categorías y búsqueda</p>
             </div>
 
             <div className="flex items-center gap-2.5">
@@ -376,8 +637,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Filtros y Búsqueda */}
-          <div className="flex flex-col sm:flex-row gap-3">
+          {/* Filtros, Categorías y Búsqueda */}
+          <div className="flex flex-col lg:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
@@ -389,22 +650,35 @@ export default function DashboardPage() {
               />
             </div>
 
+            {/* Selector de Categoría para Filtrar */}
+            <select
+              value={selectedCategoryFilter}
+              onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+              className="px-3 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="all">Todas las Categorías</option>
+              {CATEGORIES_LIST.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            {/* Filtro Tipo: Todos / Gastos / Ingresos */}
             <div className="flex items-center gap-1.5 bg-slate-950/70 p-1 border border-slate-800 rounded-xl text-xs">
               <button
                 onClick={() => setTypeFilter('all')}
-                className={`px-3 py-1 rounded-lg transition-all ${typeFilter === 'all' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${typeFilter === 'all' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-white'}`}
               >
                 Todos
               </button>
               <button
                 onClick={() => setTypeFilter('expense')}
-                className={`px-3 py-1 rounded-lg transition-all ${typeFilter === 'expense' ? 'bg-rose-600/80 text-white font-medium' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${typeFilter === 'expense' ? 'bg-rose-600/80 text-white font-medium' : 'text-slate-400 hover:text-white'}`}
               >
                 Gastos
               </button>
               <button
                 onClick={() => setTypeFilter('income')}
-                className={`px-3 py-1 rounded-lg transition-all ${typeFilter === 'income' ? 'bg-emerald-600/80 text-white font-medium' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${typeFilter === 'income' ? 'bg-emerald-600/80 text-white font-medium' : 'text-slate-400 hover:text-white'}`}
               >
                 Ingresos
               </button>
@@ -421,7 +695,7 @@ export default function DashboardPage() {
               {filteredTransactions.map((tx) => (
                 <div
                   key={tx.id}
-                  className="py-3 sm:py-3.5 flex items-center justify-between gap-3 hover:bg-slate-800/30 px-2 rounded-xl transition-all"
+                  className="py-3 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-800/30 px-2 rounded-xl transition-all"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
@@ -445,21 +719,34 @@ export default function DashboardPage() {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
                         <span>{tx.date}</span>
-                        <span>•</span>
-                        <span className="text-slate-300 font-medium">{tx.categoryName || 'Otros'}</span>
                         {tx.merchantName && (
                           <>
                             <span>•</span>
-                            <span>{tx.merchantName}</span>
+                            <span className="text-slate-300 font-medium">{tx.merchantName}</span>
                           </>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                    {/* Selector de Reclasificación Rápida */}
+                    <div className="relative">
+                      <select
+                        value={tx.categoryName || 'Otros'}
+                        onChange={(e) => handleCategoryChange(tx.id, e.target.value)}
+                        className="text-[11px] font-medium bg-slate-950/80 border border-slate-700/80 rounded-lg px-2.5 py-1 text-slate-200 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        title="Reclasificar categoría"
+                      >
+                        {CATEGORIES_LIST.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Monto */}
                     <span
                       className={`text-xs sm:text-sm font-bold ${
                         tx.type === 'income' ? 'text-emerald-400' : 'text-rose-400'
@@ -468,6 +755,7 @@ export default function DashboardPage() {
                       {tx.type === 'income' ? '+' : '-'}{formatCLP(tx.amount)}
                     </span>
 
+                    {/* Eliminar */}
                     <button
                       onClick={() => handleDelete(tx.id, tx.description)}
                       title="Eliminar movimiento"
@@ -553,16 +841,9 @@ export default function DashboardPage() {
                   onChange={(e) => setFormCategory(e.target.value)}
                   className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
-                  <option value="Alimentación">Alimentación</option>
-                  <option value="Supermercado">Supermercado</option>
-                  <option value="Transporte">Transporte</option>
-                  <option value="Vivienda">Vivienda</option>
-                  <option value="Servicios">Servicios</option>
-                  <option value="Salud">Salud</option>
-                  <option value="Entretenimiento">Entretenimiento</option>
-                  <option value="Suscripciones">Suscripciones</option>
-                  <option value="Sueldo & Honorarios">Sueldo & Honorarios</option>
-                  <option value="Otros">Otros</option>
+                  {CATEGORIES_LIST.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
                 </select>
               </div>
 
@@ -571,7 +852,7 @@ export default function DashboardPage() {
                 <label className="block text-xs font-medium text-slate-300 mb-1">Comercio (Opcional)</label>
                 <input
                   type="text"
-                  placeholder="Ej: Líder, Copec, Starbucks"
+                  placeholder="Ej: Líder, Copec, Castaño"
                   value={formMerchant}
                   onChange={(e) => setFormMerchant(e.target.value)}
                   className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -583,7 +864,7 @@ export default function DashboardPage() {
                 <label className="block text-xs font-medium text-slate-300 mb-1">Descripción</label>
                 <input
                   type="text"
-                  placeholder="Ej: Almuerzo con amigos"
+                  placeholder="Ej: Almuerzo de trabajo"
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"

@@ -1,0 +1,13 @@
+# ==============================================================================
+# VARIABLES DE ENTORNO PARA PEGAR EN VERCEL
+# Copia y pega estos valores en Vercel -> Project Settings -> Environment Variables
+# ==============================================================================
+
+DATABASE_URL="postgresql://postgres.sswypooaekfamrpikxuy:POD6PW8QYQvkDmL8@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
+TELEGRAM_BOT_TOKEN="8928668173:AAEFOHoIjF9m024KwzMLwtjsgdbN1AeaN0s"
+TELEGRAM_ALLOWED_USER_IDS="8089293413"
+TELEGRAM_WEBHOOK_SECRET="a_secret_webhook_token_for_telegram_32_chars"
+DASHBOARD_PASSWORD="admin"
+SESSION_SECRET="super-secret-session-key-32-chars-long-for-auth!"
+DEFAULT_TIMEZONE="America/Santiago"
+DEFAULT_CURRENCY="CLP"

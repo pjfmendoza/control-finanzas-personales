@@ -37,3 +37,28 @@ export async function GET(
 
   return NextResponse.json({ transaction: tx });
 }
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const isAuth = await isRequestAuthenticated(req);
+  if (!isAuth) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const { categoryName, description, amount } = body;
+
+    await dbService.updateTransaction(params.id, {
+      categoryName,
+      description,
+      amount: amount ? Math.round(amount) : undefined,
+    });
+
+    return NextResponse.json({ ok: true, message: 'Transacción actualizada' });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Error al actualizar' }, { status: 400 });
+  }
+}

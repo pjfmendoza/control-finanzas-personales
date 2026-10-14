@@ -110,6 +110,23 @@ export interface FinancialSummary {
     percentage: number;
     count: number;
   }[];
+  dailyTrend: {
+    date: string;
+    day: number;
+    amount: number;
+    cumulativeAmount: number;
+  }[];
+  dailyAverage: number;
+  projectedEndMonthExpenses: number;
+  daysInMonth: number;
+  elapsedDays: number;
+  maxExpense: {
+    amount: number;
+    description: string;
+    categoryName: string;
+    date: string;
+  } | null;
+  noSpendDays: number;
   topMerchants: {
     merchantName: string;
     amount: number;

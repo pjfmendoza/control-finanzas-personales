@@ -303,6 +303,33 @@ export const dbService = {
   },
 
   /**
+   * Actualiza los datos o categoría de una transacción
+   */
+  async updateTransaction(id: string, updates: { categoryName?: string; description?: string; amount?: number }): Promise<boolean> {
+    const db = getDb();
+    if (db) {
+      try {
+        await db.update(schema.transactions).set({
+          ...updates,
+          updatedAt: new Date(),
+        }).where(eq(schema.transactions.id, id));
+      } catch (err) {
+        console.error('Error actualizando transacción en DB:', err);
+      }
+    }
+
+    const tx = memoryStore.transactions.find(t => t.id === id);
+    if (tx) {
+      if (updates.categoryName) tx.categoryName = updates.categoryName;
+      if (updates.description) tx.description = updates.description;
+      if (updates.amount) tx.amount = updates.amount;
+      tx.updatedAt = new Date();
+      return true;
+    }
+    return true;
+  },
+
+  /**
    * Obtiene el resumen financiero determinístico (Cálculo 100% matemático en código/SQL)
    * NUNCA calculado por IA.
    */
@@ -372,6 +399,54 @@ export const dbService = {
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5);
 
+    // Métricas de Tendencia Diaria y Proyección a Fin de Mes (Run-rate)
+    const endOfMonthDate = endOfMonth(targetDate);
+    const daysInMonth = endOfMonthDate.getDate();
+    const isCurrentMonth = formatIsoDate(targetDate).substring(0, 7) === formatIsoDate(now).substring(0, 7);
+    const elapsedDays = isCurrentMonth ? Math.min(now.getDate(), daysInMonth) : daysInMonth;
+
+    // Agrupar gastos por día
+    const expensesByDate: Record<string, number> = {};
+    let maxExpense: { amount: number; description: string; categoryName: string; date: string } | null = null;
+
+    for (const tx of monthTxs) {
+      if (tx.type === 'expense') {
+        const txDate = tx.date;
+        expensesByDate[txDate] = (expensesByDate[txDate] || 0) + tx.amount;
+        if (!maxExpense || tx.amount > maxExpense.amount) {
+          maxExpense = {
+            amount: tx.amount,
+            description: tx.description,
+            categoryName: tx.categoryName || 'Otros',
+            date: tx.date,
+          };
+        }
+      }
+    }
+
+    const dailyTrend: { date: string; day: number; amount: number; cumulativeAmount: number }[] = [];
+    let cumulative = 0;
+    let daysWithZeroExpenses = 0;
+
+    for (let day = 1; day <= elapsedDays; day++) {
+      const dayStr = day < 10 ? `0${day}` : `${day}`;
+      const isoDate = `${period}-${dayStr}`;
+      const dayAmount = expensesByDate[isoDate] || 0;
+      cumulative += dayAmount;
+      if (dayAmount === 0) daysWithZeroExpenses++;
+
+      dailyTrend.push({
+        date: isoDate,
+        day,
+        amount: dayAmount,
+        cumulativeAmount: cumulative,
+      });
+    }
+
+    const dailyAverage = elapsedDays > 0 ? Math.round(totalExpenses / elapsedDays) : 0;
+    const remainingDays = Math.max(daysInMonth - elapsedDays, 0);
+    const projectedEndMonthExpenses = isCurrentMonth ? totalExpenses + (dailyAverage * remainingDays) : totalExpenses;
+
     return {
       period,
       startDate: start,
@@ -380,9 +455,16 @@ export const dbService = {
       totalExpenses,
       netSavings,
       savingsRate,
+      dailyTrend,
+      dailyAverage,
+      projectedEndMonthExpenses,
+      daysInMonth,
+      elapsedDays,
+      maxExpense,
+      noSpendDays: daysWithZeroExpenses,
       byCategory,
       topMerchants,
-      recentTransactions: monthTxs.slice(0, 10),
+      recentTransactions: monthTxs.slice(0, 15),
     };
   },
 
