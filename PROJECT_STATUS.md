@@ -5,11 +5,11 @@ Este archivo refleja el estado de avance en tiempo real del proyecto, facilitand
 ---
 
 ## 📌 Resumen Ejecutivo
-- **Fase Actual:** FASE 7 — Base de Datos Cloud Conectada y Migrada.
-- **Base de Datos en Producción:** Supabase PostgreSQL (`aws-1-sa-east-1.pooler.supabase.com:5432`) 100% activa.
-- **Tablas Creadas:** `accounts`, `categories`, `merchants`, `transactions`, `telegram_updates`, `budgets`.
-- **Datos Iniciales:** 3 cuentas base y 29 categorías/subcategorías chilenas pobladas.
-- **Estado de Pruebas:** 27 de 27 tests automáticos pasando (Vitest).
+- **Fase Actual:** FASE FINAL — **PRODUCTO EN PRODUCCIÓN 24/7 EN LA NUBE (COSTO $0 USD/MES)**.
+- **URL Dashboard Producción:** [https://control-finanzas-personales-psi.vercel.app](https://control-finanzas-personales-psi.vercel.app)
+- **Bot de Telegram:** [@ordenfinanciero1990_bot](https://t.me/ordenfinanciero1990_bot) (Webhook Serverless activo).
+- **Base de Datos Cloud:** Supabase PostgreSQL (`aws-1-sa-east-1.pooler.supabase.com:5432`) 100% operativa.
+- **Autonomía:** 100% independiente del computador local. Puede apagarse el PC en cualquier momento.
 
 ---
 
@@ -25,16 +25,23 @@ Este archivo refleja el estado de avance en tiempo real del proyecto, facilitand
 | **Fase 5** | Dashboard Web MVP (Balance, Gastos por Categoría, CRUD Movimientos) | ✅ Completado |
 | **Fase 6** | Motor de Consultas Financieras Naturales vía Telegram | ✅ Completado |
 | **Fase 7** | Base de Datos Cloud Supabase, Migraciones Drizzle y Poblado Inicial | ✅ Completado |
-| **Fase 8** | Despliegue en Vercel y vinculación de Bot de Telegram | 🔄 En Progreso |
+| **Fase 8** | Despliegue en Vercel, Webhook Oficial de Telegram y CI/CD en GitHub | ✅ Completado |
 
 ---
 
-## ✅ Logros Técnicos Verificados
-1. **Conexión Exitosa a Supabase:**
-   - Cadena de conexión configurada en `.env` mediante IPv4 Session Pooler (`aws-1-sa-east-1.pooler.supabase.com:5432`).
-2. **Esquema Relacional Desplegado:**
-   - Migración automática ejecutada con Drizzle Kit (`npm run db:push`).
-3. **Taxonomía Sembrada:**
-   - 29 categorías estructuradas (Alimentación, Supermercado, Transporte, Vivienda, Servicios, Salud, Suscripciones, etc.) y 3 cuentas (Cuenta Corriente, Efectivo, Tarjeta de Crédito).
-4. **Validación Total:**
-   - 27 pruebas unitarias e integrales ejecutadas y aprobadas en 3.76 segundos.
+## 🚀 Arquitectura en Producción Verificada
+1. **Telegram Webhook 24/7:**
+   - Webhook registrado en Telegram apuntando a `https://control-finanzas-personales-psi.vercel.app/api/telegram/webhook`.
+   - Seguridad con cabecera `X-Telegram-Bot-Api-Secret-Token`.
+   - Idempotencia estricta en tabla `telegram_updates`.
+   - Allowlist de usuario único (`ID: 8089293413`).
+2. **PostgreSQL Relacional en Supabase:**
+   - Ubicación: São Paulo, Brasil (`sa-east-1`).
+   - Tablas: `accounts`, `categories`, `merchants`, `transactions`, `telegram_updates`, `budgets`.
+   - Transacciones registradas y auditadas exitosamente.
+3. **Dashboard Web en Vercel:**
+   - URL: `https://control-finanzas-personales-psi.vercel.app`.
+   - Autenticación con contraseña única y cookie HTTP-Only segura.
+   - Analítica en tiempo real (KPIs, categorías, comercios, búsqueda, CRUD y exportador CSV/JSON).
+4. **Costo Mensual:**
+   - **$0.00 USD / mes garantizado** (Free Tiers de Vercel, Supabase y Telegram).
